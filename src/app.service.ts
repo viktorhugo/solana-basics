@@ -3,9 +3,9 @@ import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { airdropIfRequired, getKeypairFromEnvironment } from '@solana-developers/helpers';
 import { clusterApiUrl, Connection, Keypair, LAMPORTS_PER_SOL, PublicKey, sendAndConfirmTransaction, SystemProgram, Transaction, TransactionInstruction } from '@solana/web3.js';
-import { CreateMintObj } from "./interfaces/interfaces";
 
-import { ASSOCIATED_TOKEN_PROGRAM_ID, createApproveInstruction, createAssociatedTokenAccountInstruction, createBurnInstruction, createInitializeAccountInstruction, createInitializeMintInstruction, createMint, createMintToInstruction, createRevokeInstruction, createTransferInstruction, getAccount, getAccountLenForMint, getAssociatedTokenAddress, getMinimumBalanceForRentExemptMint, getMint, getOrCreateAssociatedTokenAccount, MINT_SIZE, mintTo, TOKEN_2022_PROGRAM_ID, TOKEN_PROGRAM_ID, transfer } from "@solana/spl-token";
+import { AccountLayout, ASSOCIATED_TOKEN_PROGRAM_ID, createApproveInstruction, createAssociatedTokenAccountInstruction, createBurnInstruction, createInitializeAccountInstruction, createInitializeMetadataPointerInstruction, createInitializeMintInstruction, createMint, createMintToInstruction, createRevokeInstruction, createTransferInstruction, ExtensionType, getAccount, getAccountLenForMint, getAssociatedTokenAddress, getMint, getMintLen, getOrCreateAssociatedTokenAccount, LENGTH_SIZE, mintTo, TOKEN_2022_PROGRAM_ID, TOKEN_PROGRAM_ID, tokenMetadataInitialize, tokenMetadataUpdateField, transfer, TYPE_SIZE } from "@solana/spl-token";
+import { pack, TokenMetadata } from "@solana/spl-token-metadata";
 import * as bs58 from 'bs58';
 import "dotenv/config";
 
@@ -31,8 +31,12 @@ export class AppService {
     // this.getKeypair();
     // this.generateKeyPairWith('v1ct0R');
     
-    this.main();
+    // this.main();
     // this.spl_extensions();
+    // this.getAllTokens();
+    // this.main2()
+    // this.addTokens()
+    // this.createTokenSPL_V2();
   } 
 
   public generateKeyPairWith(str: string){
@@ -43,7 +47,6 @@ export class AppService {
       }
 
   }
-
 
   public async addAirDropAccountDevNet(account: string) {
     try {
@@ -385,34 +388,6 @@ export class AppService {
     }
   }
 
-
-  public async createMintTransaction(data: CreateMintObj) {
-    try {
-      
-      const splToken = await import("@solana/spl-token");
-      const { connection, payer, mintAuthority, freezeAuthority, decimals } = data;
-      
-      // console.log('createMintTransaction', payer, mintAuthority, freezeAuthority, decimals);
-      console.log(splToken);
-      
-      
-      const tokenMint = await splToken.createMint(
-        connection, 
-        payer,
-        mintAuthority,
-        freezeAuthority,
-        decimals,
-      );
-
-      console.log(
-        `Token Mint: https://explorer.solana.com/address/${tokenMint}?cluster=devnet`,
-      );
-      return tokenMint;
-    } catch (error) {
-      console.log(error);
-    }
-  }
-
   public async transferTokens2() {
     try {
       const payer: Keypair = getKeypairFromEnvironment('PRIVATE_KEY_2');
@@ -494,7 +469,7 @@ export class AppService {
     console.log('tokenAccount Get Or CREATED', tokenAccount); 
   }
 
-  public async main() {
+  public async createTokenSPL_V1() {
     try {
       
       const payer: Keypair = getKeypairFromEnvironment('SECRET_KEY_WALLET');
@@ -502,11 +477,6 @@ export class AppService {
       const freezeAuthority = payer.publicKey;
       const decimals = 8;
       // console.log('payer.publicKey', payer.publicKey);
-      
-
-      const balance = await this.connection.getBalance(payer.publicKey);
-      console.log('balance SOL: ', balance / LAMPORTS_PER_SOL);      
-
       
       //* ==========   1. TOKEN MINT (Un Token Mint es la cuenta que contiene datos sobre un token específico.)
       // Un Token Mint es la cuenta que contiene datos sobre un token específico.
@@ -569,12 +539,248 @@ export class AppService {
       //* =========== Approve Delegate ===========================
       // Approving a delegate is the process of authorizing another account to transfer or burn tokens from a token account.
 
+    } catch (error) {
+      console.log(error);
+      
+    }
+  }
 
+  public async createTokenSPL_V2() {
+    try {
+      //* Account Wallet
+      const payer: Keypair = getKeypairFromEnvironment('SECRET_KEY_WALLET');
+      const balance = await this.connection.getBalance(payer.publicKey);
+      console.log('balance SOL: ', balance / LAMPORTS_PER_SOL); 
+
+      //* Account Authority
+      const mintAuthority = payer.publicKey;
+      const updateAuthority = payer.publicKey;
+      const freezeAuthority = payer.publicKey;
+      const decimals = 8;
+      //* Generate new keypair for Mint Account
+      const mintKeypair = Keypair.generate();
+      console.log('mintKeypair', mintKeypair.publicKey);
+      //* Address for Mint Account
+      const mint = mintKeypair.publicKey;
+      // console.log('payer.publicKey', payer.publicKey);
+      
+
+      //* Metadata to store in Mint Account
+      const metaData: TokenMetadata = {
+        updateAuthority: updateAuthority,
+        mint: mint,
+        name: "CAPY",
+        symbol: "CAPY",
+        uri: "https://viktorhugo.github.io/developers/metadata.json",
+        additionalMetadata: [
+          ["description", "Capybara Token Currency"],
+          ["autor", "Victor hugo mosquera A."],
+          ["company", "VmBross"],
+        ],
+      };
+
+
+      //* Size of Mint Account with extension
+      const mintLen = getMintLen([ExtensionType.MetadataPointer]);
+      //* Size of MetadataExtension 2 bytes for type, 2 bytes for length
+      const metadataExtension = TYPE_SIZE + LENGTH_SIZE;
+      //* Size of metadata
+      const metadataLen = pack(metaData).length;
+      console.log('metadataLen', metadataLen);
+      //* Minimum lamports required for Mint Account
+      const lamports = await this.connection.getMinimumBalanceForRentExemption(
+        mintLen + metadataExtension + metadataLen,
+      );
+
+      //* invoke System Program to create new account
+      const createAccount = await this.createAccount(
+        payer,
+        mintLen,
+        lamports,
+        mintKeypair
+      )
+      console.log('createAccount', createAccount);
+
+      //* Initialize the MetadataPointer Extension
+      const initializeMetadataPointer = await this.initPointerMetadata(
+        payer, 
+        mintKeypair, 
+        payer.publicKey,
+        TOKEN_2022_PROGRAM_ID
+      );
+      console.log('initializeMetadataPointer TX', initializeMetadataPointer);
+
+      //* Initialize Mint Account data
+      const mintedAccount = await this.initMintAccount(
+        payer,
+        mint,
+        mintAuthority,
+        freezeAuthority,
+        decimals
+      )
+      console.log('mintedAccount', mintedAccount);
+      
+      //* Initialize Metadata Account data
+      const metadataInitialize = await tokenMetadataInitialize(
+        this.connection,
+        payer,
+        mint,
+        updateAuthority,
+        mintAuthority,
+        metaData.name,
+        metaData.symbol,
+        metaData.uri,
+        [],
+        {},
+        TOKEN_2022_PROGRAM_ID
+      )
+      console.log('tokenMetadataInitialize TX', metadataInitialize);
+      
+      //* ======= Update metadata, adding custom fields ======
+      await tokenMetadataUpdateField(
+        this.connection,
+        payer,
+        mint,
+        updateAuthority,
+        metaData.additionalMetadata[0][0], // key
+        metaData.additionalMetadata[0][1], // value
+        [],
+        {},
+        TOKEN_2022_PROGRAM_ID
+      )
+      await tokenMetadataUpdateField(
+        this.connection,
+        payer,
+        mint,
+        updateAuthority,
+        metaData.additionalMetadata[1][0], // key
+        metaData.additionalMetadata[1][1], // value
+        [],
+        {},
+        TOKEN_2022_PROGRAM_ID
+      )
+      await tokenMetadataUpdateField(
+        this.connection,
+        payer,
+        mint,
+        updateAuthority,
+        metaData.additionalMetadata[2][0], // key
+        metaData.additionalMetadata[2][1], // value
+        [],
+        {},
+        TOKEN_2022_PROGRAM_ID
+      )
+      
+      //* Create associate account
+      const AssociateTokenAccount = await getOrCreateAssociatedTokenAccount( 
+        this.connection,   // Connection to use
+        payer,   //Payer of the transaction and initialization fees
+        mint,   // Mint associated with the account to set or verify
+        mintAuthority,  // Owner of the account to set or verify
+        false,  //Allow the owner account to be a PDA (Program Derived Address)
+        null,  //Desired level of commitment for querying the state
+        {},  //Options for confirming the transaction
+        TOKEN_2022_PROGRAM_ID,  //SPL Token program account
+        // ASSOCIATED_TOKEN_PROGRAM_ID  //SPL Associated Token program account
+      );
+      console.log('tokenAccount CREATED', AssociateTokenAccount);
+
+      //* =========== Mint Tokens ===========================
+      // Minting tokens is the process of issuing new tokens into circulation. 
+      const transactionSignature = await mintTo(
+        this.connection, 
+        payer, // the account of the payer for the transaction
+        mint, // the token mint that the new token account is associated with
+        AssociateTokenAccount.address, //the token account that tokens will be minted to
+        payer.publicKey, // the account authorized to mint tokens
+        BigInt(6500000000000000000), // the raw amount of tokens to mint outside of decimals.
+        [payer],
+        {},
+        TOKEN_2022_PROGRAM_ID
+      );
+    
+      console.log(
+        `Mint Token Transaction: https://explorer.solana.com/tx/${transactionSignature}?cluster=devnet`,
+      );
 
     } catch (error) {
       console.log(error);
       
     }
+  }
+
+  public async createAccount(
+    payer: Keypair,
+    space: number,
+    lamports: number,
+    accountKeypair: Keypair,
+  ) {
+    const programId = TOKEN_2022_PROGRAM_ID;
+    const tokenMintTransaction = new Transaction().add(
+      SystemProgram.createAccount({
+        fromPubkey: payer.publicKey,
+        newAccountPubkey: accountKeypair.publicKey,
+        space,
+        lamports,
+        programId,
+      }),
+    );
+
+    // Send transaction
+    await sendAndConfirmTransaction(this.connection, tokenMintTransaction, [payer, accountKeypair]);
+
+    return accountKeypair.publicKey;
+  }
+
+  public async initMintAccount(
+    payer:Keypair,
+    mint: PublicKey,
+    mintAuthority: PublicKey,
+    freezeAuthority: PublicKey,
+    decimals: number
+  ) {
+    const initializeMintInstruction = new Transaction().add(
+      createInitializeMintInstruction(
+        mint, // direccion de la cuenta Mint
+        decimals, // Decimals of Mint
+        mintAuthority, // Autoridad de la moneda designada
+        freezeAuthority, // Optional Freeze Authority
+        TOKEN_2022_PROGRAM_ID, // Token Extension Program ID
+      )
+    );
+    const tx = await sendAndConfirmTransaction(
+      this.connection,
+      initializeMintInstruction,
+      [payer], // Signers
+    );
+    
+    return tx;
+
+  }
+
+  public async initPointerMetadata(
+    payer: Keypair,
+    mintKeypair: Keypair,
+    updateAuthority: PublicKey,
+    programId
+  ) {
+
+    const initializeMetadataPointerInstruction = new Transaction().add(
+      createInitializeMetadataPointerInstruction(
+        mintKeypair.publicKey, // direccion de la cuenta Mint
+        updateAuthority, // Autoridad que puede establecer la direccion de metadatos
+        mintKeypair.publicKey, // direccion de la cuenta que contiene los metadatos
+        programId,
+      )
+    );
+
+    const tx = await sendAndConfirmTransaction(
+      this.connection,
+      initializeMetadataPointerInstruction,
+      [payer], // Signers
+    );
+    
+    return tx;
   }
 
   public async spl_extensions() {
@@ -583,8 +789,8 @@ export class AppService {
     const freezeAuthority = payer.publicKey;
     const decimals = 8;
 
-    const createTokenMint: PublicKey = await this.buildCreateTokenAccountTransaction(payer, decimals);
-    console.log(createTokenMint);
+    // const createTokenMint: PublicKey = await this.buildCreateTokenAccountTransaction(payer, decimals);
+    // console.log(createTokenMint);
     
   }
 
@@ -592,36 +798,26 @@ export class AppService {
   //* ==========   1. TOKEN MINT (Un Token Mint es la cuenta que contiene datos sobre un token específico.)
   public async buildCreateTokenAccountTransaction(
     payer: Keypair,
-    decimals: number
+    space: number,
+    lamports: number,
+    accountKeypair: Keypair
   ) {
-    
-    const lamports = await getMinimumBalanceForRentExemptMint(this.connection);
-    const accountKeypair = Keypair.generate();
     const programId = TOKEN_2022_PROGRAM_ID;
-
     const tokenMintTransaction = new Transaction().add(
       SystemProgram.createAccount({
         fromPubkey: payer.publicKey,
         newAccountPubkey: accountKeypair.publicKey,
-        space: MINT_SIZE,
+        space,
         lamports,
         programId,
       }),
-
-      createInitializeMintInstruction(
-        accountKeypair.publicKey,
-        decimals,
-        payer.publicKey,
-        payer.publicKey,
-        programId
-      )
     );
 
     // Send transaction
-    await sendAndConfirmTransaction(this.connection, tokenMintTransaction, [payer, accountKeypair]);
+    const res = await sendAndConfirmTransaction(this.connection, tokenMintTransaction, [payer, accountKeypair]);
+    // console.log(res);
 
     return accountKeypair.publicKey;
-
   }
   
 
@@ -793,5 +989,53 @@ export class AppService {
 
     return transaction
   }
+
+  public async getAllTokens() {
+    const connection = new Connection(clusterApiUrl('devnet'), 'confirmed');
+
+    const tokenAccounts = await connection.getTokenAccountsByOwner(
+      new PublicKey('64gK5Dc8iCZUg5irWah8PSBKLJFzWEjoTpqmBnyyCazQ'),
+      {
+        programId: TOKEN_2022_PROGRAM_ID,
+      }
+    );
+
+    console.log("Token                                         Balance");
+    console.log("------------------------------------------------------------");
+    tokenAccounts.value.forEach((tokenAccount) => {
+
+      const accountData = AccountLayout.decode(tokenAccount.account.data);
+      console.log(`${new PublicKey(accountData.mint)}   ${accountData.amount}`);
+    })
+
+    // const a = await this.buildCreateTokenAccountTransaction(
+    //   getKeypairFromEnvironment('PRIVATE_KEY_2'),
+    //   8
+    // )
+    
+  }
+
+  public async addTokens() {
+
+    const payer: Keypair = getKeypairFromEnvironment('SECRET_KEY_WALLET');
+
+    // Minting tokens is the process of issuing new tokens into circulation. 
+    const transactionSignature = await mintTo(
+      this.connection, 
+      payer, // the account of the payer for the transaction
+      new PublicKey('5uuwgmveAwUhQrkVYkL7vEQUCiNgyHed8H9KThVkAAAY'), // the token mint that the new token account is associated with
+      new PublicKey('7RoCSbsayZVcsBnTUrWoAMuFQe7H5YBizQG9KJDUHuRN'), //the token account that tokens will be minted to
+      payer.publicKey, // the account authorized to mint tokens
+      BigInt(6500000000000000000), // the raw amount of tokens to mint outside of decimals.
+      [payer],
+      {},
+      TOKEN_2022_PROGRAM_ID
+    );
+
+    console.log(transactionSignature);
+    
+  }
+
+  
 } 
 
