@@ -34,7 +34,6 @@ export class SolanaService {
 
   public async main(){
     // Playground wallet
-
     const payer = getKeypairFromEnvironment('SECRET_KEY_WALLET');
 
     console.log("My address:", payer.publicKey.toString());

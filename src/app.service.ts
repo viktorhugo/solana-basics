@@ -23,13 +23,13 @@ export class AppService {
     // this.wallet();
     // this.serialize();
     // this.getBalanceUsingWeb3();
-    // this.addAirDropAccountDevNet('3gT299BtUQxdDPfTyQ3dLc2AmNXjnpLPAm82MNSZ9wM2');
+    // this.addAirDropAccountDevNet('8XJh532Rumc6e7kEr8Wcj67MGT6LSJ4CPEvBjp5VaE6m');
     // this.getBalance('3gT299BtUQxdDPfTyQ3dLc2AmNXjnpLPAm82MNSZ9wM2')
     // this.getSeedFromSecretKey2("5MaiiCavjCmn9Hs1o3eznqDEhRwxo7pXiAYez7keQUviUkauRiTMD8DrESdrNjN8zd9mTmVhRvBJeg5vhyvgrAhG" )
-    // this.transferTokens2();
+    // this.createTransactions();
     // this.getOrCreateAssociatedTokenAccountSPL();
     // this.getKeypair();
-    // this.generateKeyPairWith('v1ct0R');
+    // this.generateKeyPairWith();
     
     // this.main();
     // this.spl_extensions();
@@ -37,15 +37,25 @@ export class AppService {
     // this.main2()
     // this.addTokens()
     // this.createTokenSPL_V2();
+    // this.transferTokens()
   } 
 
-  public generateKeyPairWith(str: string){
+  public generateKeyPairWith(){
       let keypair = Keypair.generate();
-      while (!keypair.publicKey.toBase58().startsWith(str)) {
+      while (
+        !keypair.publicKey.toBase58().startsWith('V1c70R') || 
+        !keypair.publicKey.toBase58().startsWith('v1c70R') || 
+        !keypair.publicKey.toBase58().startsWith('V1C70R') ||
+        !keypair.publicKey.toBase58().startsWith('v1C70R') ||
+        !keypair.publicKey.toBase58().startsWith('v1C7oR') ||
+        !keypair.publicKey.toBase58().startsWith('v1C7OR') ||
+        !keypair.publicKey.toBase58().startsWith('V1C7OR') ||
+        !keypair.publicKey.toBase58().startsWith('V1c7OR') 
+      ) {
         keypair = Keypair.generate();
         console.log(keypair.publicKey.toBase58());
       }
-
+      console.log(keypair);
   }
 
   public async addAirDropAccountDevNet(account: string) {
@@ -97,7 +107,7 @@ export class AppService {
 
   public async getBalanceUsingWeb3(): Promise<number> {
     try {
-      const account = this.configService.get<string>('PUBLIC_KEY_PAYER');
+      const account = this.configService.get<string>('KEY_WALLET');
       //connet devnet solana
       const connection = new Connection(clusterApiUrl("devnet"));
       const publicKey = new PublicKey(account);
@@ -114,12 +124,11 @@ export class AppService {
   }
 
   public createTransactions(){
-    const connection = new Connection(clusterApiUrl("devnet"));
     const transaction = new Transaction();
-    const amount = 1
-    const sender = new PublicKey('');
-    const senderKeypair = getKeypairFromEnvironment('SECRET_KEY_PAYER')
-    const recipient = new PublicKey('');
+    const amount = 10
+    const sender = new PublicKey('64gK5Dc8iCZUg5irWah8PSBKLJFzWEjoTpqmBnyyCazQ');
+    const senderKeypair = getKeypairFromEnvironment('SECRET_KEY_WALLET')
+    const recipient = new PublicKey('8XJh532Rumc6e7kEr8Wcj67MGT6LSJ4CPEvBjp5VaE6m');
 
 
     const sendSolInstruction = SystemProgram.transfer({
@@ -130,7 +139,7 @@ export class AppService {
 
     const tx = transaction.add(sendSolInstruction);
 
-    const signature = sendAndConfirmTransaction(connection, transaction, [ senderKeypair ]);
+    const signature = sendAndConfirmTransaction(this.connection, transaction, [ senderKeypair ]);
   }
 
   public async newProgram() {
@@ -388,39 +397,49 @@ export class AppService {
     }
   }
 
-  public async transferTokens2() {
+  public async transferTokens() {
     try {
-      const payer: Keypair = getKeypairFromEnvironment('PRIVATE_KEY_2');
-      const sourceTokenAccount = new PublicKey('HAiegFmMgkLiYsezD48Q6ofV5tPQfJSV5ho1hRgJX5AG');
-      const destinationTokenAccount = new PublicKey('4SYSpqiXJbzadRbzHcoVNSr7xRa44JDpFxLEX4F7Lpq6');
-      const destinationKeyPair = getKeypairFromEnvironment('PRIVATE_KEY_3');
+      const payer: Keypair = getKeypairFromEnvironment('SECRET_KEY_WALLET');
+      const tokenAddress = new PublicKey('Ef65JLck5EmpXqCaK4bxqYFQ4p6Ey7ALHhH62c9VNBbN'); // (address) Ef65JLck5EmpXqCaK4bxqYFQ4p6Ey7ALHhH62c9VNBbN / (mint) D4a91T7drfr3yX6e2hBaQpL5f5TqxG6Y7iRLDfVHKGLq
+      const destinationPayer = getKeypairFromEnvironment('SECRET_KEY_SOLFLARE');
+      console.log('payer', payer.publicKey.toBase58()); 
+      console.log('destinationPayer', destinationPayer.publicKey.toBase58());
 
       const a = await getAccount(
         this.connection,
-        sourceTokenAccount,
+        tokenAddress,
         "confirmed",
-        TOKEN_PROGRAM_ID
+        TOKEN_2022_PROGRAM_ID
+      );
+      console.log('account', a);
+      const amountTransfer = 155000000000000000;
+      const mint = await getMint(this.connection, a.mint, "confirmed", TOKEN_2022_PROGRAM_ID);
+      // console.log('mintInfo', mint);
+
+      //get the token account of the destination address, if it does not exist, create it
+      const toTokenAccount = await getOrCreateAssociatedTokenAccount(
+        this.connection, //Connection,
+        destinationPayer, // payer Signer,
+        mint.address, // mint,
+        destinationPayer.publicKey, // owner PublicKey,
+        false, // allowOwnerOffCurve,
+        "confirmed", // Commitment,
+        null,
+        TOKEN_2022_PROGRAM_ID
       );
 
-      console.log(a);
+      console.log('toTokenAccount', toTokenAccount);
       
-  
-      const amountTransfer = 10000000000000;
-      const mintInfo = await getMint(this.connection, sourceTokenAccount);
-      // destinationKeyPair
-      
-      // const destination = tokenAccount.address;
-
       const transactionSignature = await transfer(
-        this.connection, 
-        payer,  // Payer of the transaction fees 
-        sourceTokenAccount, // Source token account  
-        destinationTokenAccount, // Destination token account 
-        payer.publicKey, // Owner of the source account 
-        amountTransfer, 
-        [], 
-        {}, 
-        ASSOCIATED_TOKEN_PROGRAM_ID 
+        this.connection, //Connection,
+        payer, // Signer,
+        tokenAddress, // PublicKey,
+        toTokenAccount.address, // PublicKey,
+        payer, // Signer | PublicKey,
+        amountTransfer, // number | bigint,
+        [],  // multiSigners: Signer[] = [],
+        null, // ConfirmOptions,
+        TOKEN_2022_PROGRAM_ID
       );
     
       console.log(
@@ -438,13 +457,14 @@ export class AppService {
   }
 
   public getSeedFromSecretKey2 (secretKey: string) {
+    console.log();
+    
     const dec = bs58.decode(secretKey);
     // console.log(dec);
     const keypair = Keypair.fromSecretKey(dec);
     // console.log(keypair);
     console.log(keypair.publicKey.toBase58());
-
-    
+    return keypair;
   }
 
   public async getOrCreateAssociatedTokenAccountSPL() {
