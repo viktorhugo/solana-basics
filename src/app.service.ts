@@ -2,9 +2,9 @@ import * as borsh from "@coral-xyz/borsh";
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { airdropIfRequired, getKeypairFromEnvironment } from '@solana-developers/helpers';
-import { clusterApiUrl, Connection, Keypair, LAMPORTS_PER_SOL, PublicKey, sendAndConfirmTransaction, SystemProgram, Transaction, TransactionInstruction } from '@solana/web3.js';
+import { clusterApiUrl, ConfirmOptions, Connection, Keypair, LAMPORTS_PER_SOL, PublicKey, sendAndConfirmTransaction, Signer, SystemProgram, Transaction, TransactionInstruction } from '@solana/web3.js';
 
-import { AccountLayout, ASSOCIATED_TOKEN_PROGRAM_ID, createApproveInstruction, createAssociatedTokenAccountInstruction, createBurnInstruction, createInitializeAccountInstruction, createInitializeMetadataPointerInstruction, createInitializeMintInstruction, createMint, createMintToInstruction, createRevokeInstruction, createTransferInstruction, ExtensionType, getAccount, getAccountLenForMint, getAssociatedTokenAddress, getMint, getMintLen, getOrCreateAssociatedTokenAccount, LENGTH_SIZE, mintTo, TOKEN_2022_PROGRAM_ID, TOKEN_PROGRAM_ID, tokenMetadataInitialize, tokenMetadataUpdateField, transfer, TYPE_SIZE } from "@solana/spl-token";
+import { AccountLayout, ASSOCIATED_TOKEN_PROGRAM_ID, createApproveInstruction, createAssociatedTokenAccountInstruction, createBurnInstruction, createInitializeAccountInstruction, createInitializeMetadataPointerInstruction, createInitializeMintInstruction, createMint, createMintToInstruction, createRevokeInstruction, createTransferInstruction, ExtensionType, getAccount, getAccountLenForMint, getAssociatedTokenAddress, getAssociatedTokenAddressSync, getMint, getMintLen, getOrCreateAssociatedTokenAccount, LENGTH_SIZE, mintTo, TOKEN_2022_PROGRAM_ID, TOKEN_PROGRAM_ID, tokenMetadataInitialize, tokenMetadataUpdateField, transfer, TYPE_SIZE, unpackAccount } from "@solana/spl-token";
 import { pack, TokenMetadata } from "@solana/spl-token-metadata";
 import * as bs58 from 'bs58';
 import "dotenv/config";
@@ -37,7 +37,7 @@ export class AppService {
     // this.main2()
     // this.addTokens()
     // this.createTokenSPL_V2();
-    // this.transferTokens()
+    this.transferTokens2('C8TX9TVhBa9h5StcJWL7a3uQRjo2ZHRHDgioUMvLUzrC')
   } 
 
   public generateKeyPairWith(){
@@ -414,7 +414,7 @@ export class AppService {
       console.log('account', a);
       const amountTransfer = 155000000000000000;
       const mint = await getMint(this.connection, a.mint, "confirmed", TOKEN_2022_PROGRAM_ID);
-      // console.log('mintInfo', mint);
+      console.log('mintInfo', mint);
 
       //get the token account of the destination address, if it does not exist, create it
       const toTokenAccount = await getOrCreateAssociatedTokenAccount(
@@ -436,6 +436,61 @@ export class AppService {
         tokenAddress, // PublicKey,
         toTokenAccount.address, // PublicKey,
         payer, // Signer | PublicKey,
+        amountTransfer, // number | bigint,
+        [],  // multiSigners: Signer[] = [],
+        null, // ConfirmOptions,
+        TOKEN_2022_PROGRAM_ID
+      );
+    
+      console.log(
+        `Transfer Transaction: https://explorer.solana.com/tx/${transactionSignature}?cluster=devnet`,
+      );
+  
+    } catch (error) {
+      console.log(error);
+      
+    }
+  }
+
+  public async transferTokens2(destinationString: string) {
+    try {
+      const payer: Keypair = getKeypairFromEnvironment('SECRET_KEY_WALLET');
+      const destinationOwner = new PublicKey(destinationString);
+      const mintToken = new PublicKey('D4a91T7drfr3yX6e2hBaQpL5f5TqxG6Y7iRLDfVHKGLq');
+      console.log('payer', payer.publicKey.toBase58());
+      console.log('destination', destinationOwner.toBase58());
+
+      const mintOwner = await getAssociatedTokenAddress(
+        mintToken,// mint: PublicKey,
+        payer.publicKey,// owner: PublicKey,
+        true,// allowOwnerOffCurve = false,
+        TOKEN_2022_PROGRAM_ID// programId = TOKEN_PROGRAM_ID,
+        // associatedTokenProgramId = ASSOCIATED_TOKEN_PROGRAM_ID        
+      );
+      console.log('mintOwner', mintOwner);
+
+      const mintDestination = await getAssociatedTokenAddressSync(
+        mintToken,// mint: PublicKey,
+        destinationOwner,// owner: PublicKey,
+        false,// allowOwnerOffCurve = false,
+        TOKEN_2022_PROGRAM_ID// programId = TOKEN_PROGRAM_ID,
+        // associatedTokenProgramId = ASSOCIATED_TOKEN_PROGRAM_ID        
+      );
+      console.log('mintDestination', mintDestination);
+      const account = await getAccount(this.connection, mintDestination, "confirmed", TOKEN_2022_PROGRAM_ID);
+      console.log(account);
+
+      const amountTransfer = 500000000000000;
+      const source: PublicKey = mintOwner;
+      const destination: PublicKey = mintDestination;
+      const owner: PublicKey = payer.publicKey;
+      
+      const transactionSignature = await transfer(
+        this.connection, //Connection,
+        payer, // Signer,
+        source, //  source PublicKey,
+        destination, // destination PublicKey,
+        owner, // Signer | PublicKey,
         amountTransfer, // number | bigint,
         [],  // multiSigners: Signer[] = [],
         null, // ConfirmOptions,

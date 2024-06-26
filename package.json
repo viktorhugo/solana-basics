@@ -24,7 +24,7 @@
     "@nestjs/common": "^10.0.0",
     "@nestjs/config": "^3.2.2",
     "@nestjs/core": "^10.0.0",
-    "@nestjs/platform-express": "^10.0.0",
+    "@nestjs/platform-express": "^10.3.9",
     "@solana-developers/helpers": "^2.3.0",
     "@solana/spl-token": "^0.4.6",
     "@solana/spl-token-metadata": "^0.1.4",
