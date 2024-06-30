@@ -24,7 +24,7 @@ import "dotenv/config";
 export class SolanaService {
 
   // Connection to devnet cluster
-  public connection: Connection = new Connection(clusterApiUrl("devnet"), "confirmed");
+  public connection: Connection = new Connection(clusterApiUrl("testnet"), "confirmed");
   public totalSupplyToken = 6500000000000000000;
 
   constructor(private configService: ConfigService) {

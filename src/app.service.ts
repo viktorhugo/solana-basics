@@ -1,8 +1,8 @@
 import * as borsh from "@coral-xyz/borsh";
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { airdropIfRequired, getKeypairFromEnvironment } from '@solana-developers/helpers';
-import { clusterApiUrl, ConfirmOptions, Connection, Keypair, LAMPORTS_PER_SOL, PublicKey, sendAndConfirmTransaction, Signer, SystemProgram, Transaction, TransactionInstruction } from '@solana/web3.js';
+import { airdropIfRequired, confirmTransaction, getKeypairFromEnvironment } from '@solana-developers/helpers';
+import { clusterApiUrl, ConfirmOptions, Connection, Keypair, LAMPORTS_PER_SOL, PublicKey, sendAndConfirmRawTransaction, sendAndConfirmTransaction, Signer, SystemProgram, Transaction, TransactionInstruction, VersionedTransaction } from '@solana/web3.js';
 
 import { AccountLayout, ASSOCIATED_TOKEN_PROGRAM_ID, createApproveInstruction, createAssociatedTokenAccountInstruction, createBurnInstruction, createInitializeAccountInstruction, createInitializeMetadataPointerInstruction, createInitializeMintInstruction, createMint, createMintToInstruction, createRevokeInstruction, createTransferInstruction, ExtensionType, getAccount, getAccountLenForMint, getAssociatedTokenAddress, getAssociatedTokenAddressSync, getMint, getMintLen, getOrCreateAssociatedTokenAccount, LENGTH_SIZE, mintTo, TOKEN_2022_PROGRAM_ID, TOKEN_PROGRAM_ID, tokenMetadataInitialize, tokenMetadataUpdateField, transfer, TYPE_SIZE, unpackAccount } from "@solana/spl-token";
 import { pack, TokenMetadata } from "@solana/spl-token-metadata";
@@ -13,7 +13,7 @@ import "dotenv/config";
 @Injectable()
 export class AppService {
 
-  public connection: Connection = new Connection(clusterApiUrl("devnet"), { commitment: "confirmed" });
+  public connection: Connection = new Connection(clusterApiUrl("testnet"), { commitment: "confirmed" });
   public totalSupplyToken = 6500000000000000000;
   
   constructor(private configService: ConfigService) {
@@ -23,7 +23,7 @@ export class AppService {
     // this.wallet();
     // this.serialize();
     // this.getBalanceUsingWeb3();
-    // this.addAirDropAccountDevNet('8XJh532Rumc6e7kEr8Wcj67MGT6LSJ4CPEvBjp5VaE6m');
+    // this.addAirDropAccountDevNet('64gK5Dc8iCZUg5irWah8PSBKLJFzWEjoTpqmBnyyCazQ');
     // this.getBalance('3gT299BtUQxdDPfTyQ3dLc2AmNXjnpLPAm82MNSZ9wM2')
     // this.getSeedFromSecretKey2("5MaiiCavjCmn9Hs1o3eznqDEhRwxo7pXiAYez7keQUviUkauRiTMD8DrESdrNjN8zd9mTmVhRvBJeg5vhyvgrAhG" )
     // this.createTransactions();
@@ -37,7 +37,10 @@ export class AppService {
     // this.main2()
     // this.addTokens()
     // this.createTokenSPL_V2();
-    this.transferTokens2('C8TX9TVhBa9h5StcJWL7a3uQRjo2ZHRHDgioUMvLUzrC')
+    // this.transferTokens()
+    // this.transferTokens2('8XJh532Rumc6e7kEr8Wcj67MGT6LSJ4CPEvBjp5VaE6m')
+    this.transferTokens3('8XJh532Rumc6e7kEr8Wcj67MGT6LSJ4CPEvBjp5VaE6m')
+    // this.createAssociatedTokenAccount('4EBeEUPiXHTMRSpce4zEY6VPd3zQKPZY5y9Ev1ex1gap')
   } 
 
   public generateKeyPairWith(){
@@ -400,8 +403,9 @@ export class AppService {
   public async transferTokens() {
     try {
       const payer: Keypair = getKeypairFromEnvironment('SECRET_KEY_WALLET');
-      const tokenAddress = new PublicKey('Ef65JLck5EmpXqCaK4bxqYFQ4p6Ey7ALHhH62c9VNBbN'); // (address) Ef65JLck5EmpXqCaK4bxqYFQ4p6Ey7ALHhH62c9VNBbN / (mint) D4a91T7drfr3yX6e2hBaQpL5f5TqxG6Y7iRLDfVHKGLq
-      const destinationPayer = getKeypairFromEnvironment('SECRET_KEY_SOLFLARE');
+      const tokenAddress = new PublicKey('3DJFT1hwiNTn33bXm72qgmNfJSLYkisL9F1UfA35rwDJ'); // (address) 3DJFT1hwiNTn33bXm72qgmNfJSLYkisL9F1UfA35rwDJ / (mint) 4EBeEUPiXHTMRSpce4zEY6VPd3zQKPZY5y9Ev1ex1gap
+      // const tokenAddress = new PublicKey('Ef65JLck5EmpXqCaK4bxqYFQ4p6Ey7ALHhH62c9VNBbN'); // (address) Ef65JLck5EmpXqCaK4bxqYFQ4p6Ey7ALHhH62c9VNBbN / (mint) D4a91T7drfr3yX6e2hBaQpL5f5TqxG6Y7iRLDfVHKGLq
+      const destinationPayer = this.getSeedFromSecretKey2(process.env.SECRET_BN);
       console.log('payer', payer.publicKey.toBase58()); 
       console.log('destinationPayer', destinationPayer.publicKey.toBase58());
 
@@ -412,7 +416,7 @@ export class AppService {
         TOKEN_2022_PROGRAM_ID
       );
       console.log('account', a);
-      const amountTransfer = 155000000000000000;
+      const amountTransfer = 6000000000000000000;
       const mint = await getMint(this.connection, a.mint, "confirmed", TOKEN_2022_PROGRAM_ID);
       console.log('mintInfo', mint);
 
@@ -456,7 +460,7 @@ export class AppService {
     try {
       const payer: Keypair = getKeypairFromEnvironment('SECRET_KEY_WALLET');
       const destinationOwner = new PublicKey(destinationString);
-      const mintToken = new PublicKey('D4a91T7drfr3yX6e2hBaQpL5f5TqxG6Y7iRLDfVHKGLq');
+      const mintToken = new PublicKey(process.env.TOKEN_DEVNET_COP);
       console.log('payer', payer.publicKey.toBase58());
       console.log('destination', destinationOwner.toBase58());
 
@@ -480,7 +484,7 @@ export class AppService {
       const account = await getAccount(this.connection, mintDestination, "confirmed", TOKEN_2022_PROGRAM_ID);
       console.log(account);
 
-      const amountTransfer = 500000000000000;
+      const amountTransfer = 100000000000000000;
       const source: PublicKey = mintOwner;
       const destination: PublicKey = mintDestination;
       const owner: PublicKey = payer.publicKey;
@@ -504,6 +508,129 @@ export class AppService {
     } catch (error) {
       console.log(error);
       
+    }
+  }
+
+  public async transferTokens3(destinationString: string) {
+    try {
+      const payer: Keypair = getKeypairFromEnvironment('SECRET_KEY_WALLET');
+      const destinationOwner = new PublicKey(destinationString);
+      const mintToken = new PublicKey(process.env.TOKEN_TESTNET_COP);
+      console.log('payer', payer.publicKey.toBase58());
+      console.log('destination', destinationOwner.toBase58());
+
+      const mintOwner = await getAssociatedTokenAddress(
+        mintToken,// mint: PublicKey,
+        payer.publicKey,// owner: PublicKey,
+        true,// allowOwnerOffCurve = false,
+        TOKEN_2022_PROGRAM_ID// programId = TOKEN_PROGRAM_ID,
+        // associatedTokenProgramId = ASSOCIATED_TOKEN_PROGRAM_ID        
+      );
+      console.log('mintOwner', mintOwner);
+
+      const mintDestination = await getAssociatedTokenAddressSync(
+        mintToken,// mint: PublicKey,
+        destinationOwner,// owner: PublicKey,
+        false,// allowOwnerOffCurve = false,
+        TOKEN_2022_PROGRAM_ID// programId = TOKEN_PROGRAM_ID,
+        // associatedTokenProgramId = ASSOCIATED_TOKEN_PROGRAM_ID   
+      );
+      console.log('mintDestination', mintDestination);
+      const account = await getAccount(this.connection, mintDestination, "confirmed", TOKEN_2022_PROGRAM_ID);
+      // console.log(account);
+
+      const amountTransfer = 100000000000000000;
+      const source: PublicKey = mintOwner;
+      const destination: PublicKey = mintDestination;
+      const owner: PublicKey = payer.publicKey;
+      const { blockhash } = await this.connection.getLatestBlockhash();
+      const transaction = new Transaction().add(
+        createTransferInstruction(
+            source,
+            destination, 
+            owner, 
+            amountTransfer, 
+            [], 
+            TOKEN_2022_PROGRAM_ID
+        )
+      );
+      
+      transaction.recentBlockhash = blockhash;
+      transaction.feePayer = owner;
+
+      const signer: Signer = {
+        publicKey: payer.publicKey,
+        secretKey: payer.secretKey,
+      }
+      transaction.sign(signer)
+      console.log(transaction);
+
+      
+      try {
+        const signature = await this.connection.sendRawTransaction(transaction.serialize());
+        console.log('Transaction Signature', signature);
+      
+        const res = await confirmTransaction(this.connection, signature); // increased timeout to 60 seconds
+        console.log('Transaction Confirmation', res);
+
+        // const res = await this.connection.sendTransaction( transaction, [payer])
+        // console.log('res', res);
+        // const con = await this.connection.confirmTransaction(signature, 'confirmed')
+        // console.log('con', con);
+
+        // const rw = await sendAndConfirmTransaction(this.connection, transaction, [payer]);
+        // console.log(rw);
+        
+      } catch (error) {
+        console.error('Transaction Error', error);
+      }
+  
+    } catch (error) {
+      console.log(error);
+      
+    }
+  }
+
+  public async createAssociatedTokenAccount(mintAddress: string): Promise<{pass: boolean, associatedToken: string, error: any}> {
+    const mint = new PublicKey(mintAddress);
+    const owner = getKeypairFromEnvironment('SECRET_KEY_SOLFLARE');
+    console.log('mint', mint.toBase58()); 
+    console.log('owner', owner.publicKey.toBase58()); 
+    const associatedToken = getAssociatedTokenAddressSync(
+      mint,
+      owner.publicKey,
+      false,
+      TOKEN_2022_PROGRAM_ID,
+      ASSOCIATED_TOKEN_PROGRAM_ID
+    );
+    console.log('associatedToken', associatedToken.toBase58()); 
+    
+    try {
+      
+      const transaction = new Transaction().add(
+        createAssociatedTokenAccountInstruction(
+          owner.publicKey,  // payer
+          associatedToken,  // associatedToken
+          owner.publicKey,  // owner
+          mint,  // mint
+          TOKEN_2022_PROGRAM_ID,  // programId
+          ASSOCIATED_TOKEN_PROGRAM_ID  // associatedTokenProgramId
+        )
+      );
+      
+      const { blockhash } = await this.connection.getLatestBlockhash("confirmed");
+      transaction.recentBlockhash = blockhash;
+      transaction.feePayer = owner.publicKey;
+      transaction.sign(owner);
+
+      const signature = await this.connection.sendRawTransaction(transaction.serialize());
+      await this.connection.confirmTransaction(signature, 'confirmed');
+      console.log('Associated Token Account created:', associatedToken);
+      return { pass: true, associatedToken: associatedToken.toBase58(), error: null};
+      
+    } catch (error) {
+      console.log(error);
+      return { pass: false, associatedToken: associatedToken.toBase58(), error: error};
     }
   }
 
